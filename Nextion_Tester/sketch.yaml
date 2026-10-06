@@ -1,0 +1,35 @@
+# arduino-cli build profiles. Each profile pins the board core and points at
+# the libraries vendored in ../libraries, so a fresh machine needs only
+# arduino-cli itself:
+#
+#   arduino-cli compile --profile uno
+#   arduino-cli upload  --profile uno -p COM5
+#
+# See ../build.ps1 for a wrapper that also opens the serial monitor.
+
+default_profile: uno
+
+profiles:
+  uno:
+    fqbn: arduino:avr:uno
+    platforms:
+      - platform: arduino:avr (1.8.6)
+    libraries:
+      - dir: ../libraries/NeoNextion
+      - dir: ../libraries/AccelStepper
+
+  nano:
+    fqbn: arduino:avr:nano:cpu=atmega328old
+    platforms:
+      - platform: arduino:avr (1.8.6)
+    libraries:
+      - dir: ../libraries/NeoNextion
+      - dir: ../libraries/AccelStepper
+
+  mega:
+    fqbn: arduino:avr:mega:cpu=atmega2560
+    platforms:
+      - platform: arduino:avr (1.8.6)
+    libraries:
+      - dir: ../libraries/NeoNextion
+      - dir: ../libraries/AccelStepper
