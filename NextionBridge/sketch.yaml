@@ -1,0 +1,27 @@
+# arduino-cli build profiles for the bridge sketch. Keep identical to
+# ../Nextion_Tester/sketch.yaml so every sketch builds for every board.
+#
+#   ../build.sh upload -s NextionBridge -P COMx
+
+default_profile: nano_every
+
+profiles:
+  nano_every:
+    fqbn: arduino:megaavr:nona4809
+    platforms:
+      - platform: arduino:megaavr (1.8.8)
+
+  uno:
+    fqbn: arduino:avr:uno
+    platforms:
+      - platform: arduino:avr (1.8.6)
+
+  nano:
+    fqbn: arduino:avr:nano:cpu=atmega328old
+    platforms:
+      - platform: arduino:avr (1.8.6)
+
+  mega:
+    fqbn: arduino:avr:mega:cpu=atmega2560
+    platforms:
+      - platform: arduino:avr (1.8.6)

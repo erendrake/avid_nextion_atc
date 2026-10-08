@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
 #
-# Build, upload and monitor the Nextion_Tester sketch with arduino-cli.
-# Works in Git Bash on Windows, macOS and Linux. Uses the profiles in
-# Nextion_Tester/sketch.yaml, so nothing is installed globally except
-# arduino-cli itself.
+# Build, upload and monitor the sketches in this repo with arduino-cli.
+# Works in Git Bash on Windows, macOS and Linux. Uses the profiles in each
+# sketch's sketch.yaml, so nothing is installed globally except arduino-cli.
 #
 # Usage:
-#   ./build.sh                      compile for the default profile (nano_every)
+#   ./build.sh                      compile Nextion_Tester for the default profile (nano_every)
 #   ./build.sh build -p mega        compile for another profile
 #   ./build.sh upload               compile + upload, auto-detect the port
 #   ./build.sh upload -P COM7       compile + upload to a specific port
 #   ./build.sh monitor -P COM7      open the 115200 baud debug monitor
 #   ./build.sh all -P COM7          compile, upload, then monitor
 #   ./build.sh upload --raw-dump    RAW_DUMP=1 build (print bytes, no event decoding)
+#   ./build.sh upload -s NextionBridge   flash the USB<->display bridge (for TFT uploads)
 #   ./build.sh ports                list serial ports and detected boards
 #   ./build.sh install              install arduino-cli (winget / brew / curl)
 #
 # Options:
-#   -p, --profile  nano_every|uno|nano|mega   (default: nano_every)
+#   -s, --sketch   Nextion_Tester|NextionBridge  (default: Nextion_Tester)
+#   -p, --profile  nano_every|uno|nano|mega      (default: nano_every)
 #   -P, --port     COMx or /dev/tty* (default: auto-detect)
 #   -b, --baud     monitor baud     (default: 115200)
 #   --raw-dump                       compile with -DRAW_DUMP=1
@@ -26,9 +27,9 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-sketch="$here/Nextion_Tester"
 
 task="build"
+sketch_name="Nextion_Tester"
 profile="nano_every"
 port=""
 baud="115200"
@@ -40,6 +41,7 @@ usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
 while [ $# -gt 0 ]; do
   case "$1" in
     build|upload|monitor|all|ports|install) task="$1" ;;
+    -s|--sketch)  sketch_name="$2"; shift ;;
     -p|--profile) profile="$2"; shift ;;
     -P|--port)    port="$2"; shift ;;
     -b|--baud)    baud="$2"; shift ;;
@@ -52,6 +54,12 @@ while [ $# -gt 0 ]; do
 done
 
 case "$profile" in nano_every|uno|nano|mega) ;; *) echo "unknown profile: $profile (nano_every|uno|nano|mega)" >&2; exit 2 ;; esac
+
+sketch="$here/$sketch_name"
+if [ ! -f "$sketch/sketch.yaml" ]; then
+  echo "unknown sketch: $sketch_name (no $sketch_name/sketch.yaml in repo)" >&2
+  exit 2
+fi
 
 say() { printf '\033[36m%s\033[0m\n' "$*"; }
 warn() { printf '\033[33m%s\033[0m\n' "$*"; }

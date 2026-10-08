@@ -8,14 +8,15 @@ on:
 
 jobs:
   compile:
-    name: ${{ matrix.profile }}
+    name: ${{ matrix.sketch }} / ${{ matrix.profile }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # One job per profile in Nextion_Tester/sketch.yaml. The profile pins
-        # the board core and the vendored libraries, so CI builds exactly what
-        # ./build.sh builds locally. Add a profile there, then add it here.
+        # One job per sketch per profile. Each sketch's sketch.yaml pins the
+        # board core (and libraries), so CI builds exactly what ./build.sh
+        # builds locally. Add a profile or sketch there, then add it here.
+        sketch: [Nextion_Tester, NextionBridge]
         profile: [nano_every, uno, nano, mega]
 
     steps:
@@ -27,10 +28,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.arduino15
-          key: arduino15-${{ runner.os }}-${{ hashFiles('Nextion_Tester/sketch.yaml') }}
+          key: arduino15-${{ runner.os }}-${{ hashFiles('**/sketch.yaml') }}
 
-      - name: Compile (${{ matrix.profile }})
-        run: ./build.sh build -p ${{ matrix.profile }}
+      - name: Compile
+        run: ./build.sh build -s ${{ matrix.sketch }} -p ${{ matrix.profile }}
 
-      - name: Compile raw-dump variant (${{ matrix.profile }})
-        run: ./build.sh build -p ${{ matrix.profile }} --raw-dump
+      - name: Compile raw-dump variant
+        if: matrix.sketch == 'Nextion_Tester'
+        run: ./build.sh build -s ${{ matrix.sketch }} -p ${{ matrix.profile }} --raw-dump

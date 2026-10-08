@@ -5,10 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 Arduino firmware for a Nextion touchscreen pendant that will drive an AVID CNC
-automatic tool changer. Currently only a bring-up sketch (`Nextion_Tester`)
-exists; it proves two-way serial communication with the display. There is no
-test suite and no linter. "Verification" means it compiles for every profile
-and, ideally, behaves on real hardware (which CI cannot check).
+automatic tool changer. Two sketches exist: `Nextion_Tester`, the bring-up
+sketch that proves two-way serial communication with the display, and
+`NextionBridge`, a USB-to-display pass-through used only while uploading a
+`.tft` to the display through the Arduino. There is no test suite and no
+linter. "Verification" means it compiles for every profile and, ideally,
+behaves on real hardware (which CI cannot check).
 
 ## Build commands
 
@@ -22,8 +24,9 @@ are needed.
 The user works in Git Bash on Windows; use `build.sh`, not PowerShell.
 
 ```sh
-./build.sh                           # compile, default profile nano_every
+./build.sh                           # compile Nextion_Tester, default profile nano_every
 ./build.sh build -p mega             # compile for another profile
+./build.sh build -s NextionBridge    # compile the other sketch
 ./build.sh build --raw-dump          # compile with RAW_DUMP=1 (raw byte dump, no event decoding)
 ./build.sh upload -P COM7            # compile + upload
 ./build.sh monitor -P COM7           # 115200 baud serial monitor
@@ -37,11 +40,12 @@ arduino-cli compile --profile nano_every Nextion_Tester
 arduino-cli compile --profile nano_every --build-property build.extra_flags=-DRAW_DUMP=1 Nextion_Tester
 ```
 
-Before claiming a change builds, compile **all four profiles**. They cover
-two different cores (megaavr and avr) and two serial code paths (hardware
-`Serial1` on nano_every/mega, SoftwareSerial on uno/nano), so a single
-profile is not sufficient. CI (`.github/workflows/compile.yml`) runs the
-same four builds; keep its matrix in sync with `sketch.yaml`.
+Before claiming a change builds, compile **all four profiles** for the sketch
+you touched. They cover two different cores (megaavr and avr) and two serial
+code paths (hardware `Serial1` on nano_every/mega, SoftwareSerial on
+uno/nano), so a single profile is not sufficient. CI
+(`.github/workflows/compile.yml`) runs sketch x profile; keep its matrix in
+sync with the `sketch.yaml` files, which must list the same profiles.
 
 arduino-cli's default is `--warnings none`. Turning warnings on floods the
 output with `-Wwrite-strings` from the vendored NeoNextion; that noise is

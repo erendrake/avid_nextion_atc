@@ -17,6 +17,7 @@ far and its job is to prove the display and the Arduino can talk both ways.
 | --- | --- |
 | `Nextion_Tester/Nextion_Tester.ino` | Bring-up sketch: two buttons, callbacks, status LED, raw byte dump mode |
 | `Nextion_Tester/sketch.yaml` | arduino-cli build profiles (`nano_every` default, plus `uno`, `nano`, `mega`) pinned to board cores and the vendored libraries |
+| `NextionBridge/NextionBridge.ino` | USB-to-display serial pass-through so the Nextion Editor can upload `.tft` files through the Arduino |
 | `libraries/NeoNextion/` | Vendored [NeoNextion](https://github.com/DanNixon/NeoNextion) 2.2.0, the Nextion driver (GPL v2) |
 | `libraries/AccelStepper/` | Vendored [AccelStepper](http://www.airspayce.com/mikem/arduino/AccelStepper/) 1.64 for future stepper control (GPL v3) |
 | `build.sh` | Wrapper for Git Bash / macOS / Linux: compile, upload, serial monitor, port discovery |
@@ -128,6 +129,67 @@ Callbacks attached. Touch the buttons.
 UP pressed
 UP released
 ```
+
+## Uploading
+
+There are two things to program: the Arduino and the display. They are
+independent, and the display keeps its firmware across Arduino re-flashes.
+
+### Arduino
+
+```sh
+./build.sh ports                  # find the COM port
+./build.sh upload -P COMx         # compile + flash Nextion_Tester
+```
+
+If `ports` shows nothing but `COM1`, Windows has not enumerated the board.
+Try another USB cable first: many micro-USB cables are charge-only and the
+Nano Every will light up on them but never appear as a port. Then try
+another USB port. The Nano Every needs no driver on Windows 10/11.
+
+### Display
+
+The display is programmed with a `.tft` file produced by the Nextion Editor
+(`File > TFT file output`). Three ways to get it onto the panel, in order of
+preference:
+
+**1. microSD card (simplest, no extra hardware).**
+
+1. Format a microSD card (32 GB or smaller) as FAT32.
+2. Copy exactly one `.tft` file onto it, at the root. Remove any old ones.
+3. With the display **powered off**, insert the card.
+4. Power the display on. It shows an "update" progress screen, then
+   `Update Successed!`.
+5. Power off, remove the card, power on. The new HMI is running.
+
+If it boots to the old screen without updating, the card is not FAT32, has
+more than one `.tft`, or is larger than 32 GB.
+
+**2. Through the Arduino with the bridge sketch (no adapter, no card).**
+
+`NextionBridge` turns the Arduino into a transparent USB-to-display serial
+pass-through. The Nextion Editor's upload protocol starts at the display's
+current baud and then asks for a faster one; the bridge watches for that
+request and switches both ports so the bulk transfer runs at full speed.
+
+```sh
+./build.sh upload -s NextionBridge -P COMx     # flash the bridge
+# Nextion Editor: Upload > pick the Arduino's COM port > Go
+./build.sh upload -P COMx                      # flash the real sketch again
+```
+
+Use a Nano Every or Mega for this. On an Uno or classic Nano the display is
+on SoftwareSerial, which cannot keep up with the upload baud; keep the
+Editor's baud at 9600 or 19200 there, or use the microSD card.
+
+This path is written against the published upload protocol but has not
+yet been exercised on hardware; if the Editor reports a connection failure,
+fall back to the card.
+
+**3. USB-TTL adapter directly to the display.** Wire a 5 V-tolerant USB-TTL
+adapter (TX to the display's blue wire, RX to yellow, plus 5 V and GND),
+unplug the display from the Arduino, and use the Editor's Upload with the
+adapter's COM port. This is what Nextion documents officially.
 
 ## Configuring the HMI in the Nextion Editor
 
