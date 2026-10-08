@@ -38,7 +38,8 @@ version together.
 - A Nextion display (any Basic/Enhanced/Intelligent model). Default baud is
   9600. The display's TX is 3.3 V and its RX tolerates 5 V, so no level
   shifting is needed with any of these boards.
-- Optional: an LED on D7 that mirrors the UP button.
+- No other parts. Button presses are shown on the board's built-in LED
+  (D13 on the Nano Every) and on the serial monitor.
 
 ### Wiring diagram (Nano Every)
 
@@ -50,11 +51,9 @@ version together.
            |   D1 / TX1       |----------------------------->| RX   yellow  |
            |   D0 / RX1       |<-----------------------------| TX   blue    |
            |   5V             |------------------------------| 5V   red     |
-           |   GND            |---------+--------------------| GND  black   |
-           |                  |         |                    +--------------+
-           |   D7             |--[330R]-|>|--+               
-           |                  |             |                 optional status LED
-           |   GND            |-------------+                 (anode to resistor)
+           |   GND            |------------------------------| GND  black   |
+           |                  |                              +--------------+
+           |   D13 (LED)      |  built-in LED: lights 1 s on any button press
            +------------------+
 ```
 
@@ -70,7 +69,6 @@ Pin table for every supported board:
 | black, GND | GND | GND | GND |
 | blue, TX | D0 (RX1) | D10 | pin 19 (RX1) |
 | yellow, RX | D1 (TX1) | D11 | pin 18 (TX1) |
-| status LED (optional) | D7 | D7 | D7 |
 
 Power the display from the Arduino's 5 V pin only for small panels (the 2.4"
 to 3.5" Basic models draw well under 250 mA). Larger or Enhanced/Intelligent
@@ -125,10 +123,17 @@ Expected output on the monitor after reset:
 
 ```
 Nextion init: OK
-Callbacks attached. Touch the buttons.
-UP pressed
-UP released
+Callbacks attached: b1 (id 6) -> onUpButton, b2 (id 7) -> onDownButton
+Press a button: LED lights for 1 s and the button is named here.
+UP   (b1, id 6) pressed
+UP   (b1, id 6) released
+DOWN (b2, id 7) pressed
+DOWN (b2, id 7) released
 ```
+
+The built-in LED lights for one second on every press. The log line names
+the button, so if the wrong name shows up for a physical button the
+component id in the sketch does not match the HMI.
 
 ## Uploading
 
@@ -211,6 +216,28 @@ For **every** button you want the Arduino to hear about:
 
 If a button is missing the Send Component ID tick, the display will never
 send a touch frame for it and no amount of Arduino-side debugging will help.
+
+### Adding a button
+
+Every button has its own widget object and its own callback function. There
+is deliberately no shared "any button" handler: the library matches each
+incoming touch frame to exactly one widget by page and component id, and a
+dedicated callback makes a wrong id show up as the wrong name in the log.
+The three places to edit are marked `ADD A BUTTON` in the sketch:
+
+```cpp
+#define ID_AIR_BUTTON 8                                   // 1. id from the Editor
+NextionButton airButton(nex, PAGE_MAIN, ID_AIR_BUTTON, "b3");   // 2. widget
+void onAirButton(NextionEventType type, INextionTouchable *widget)   // 3. callback
+{
+  (void)widget;
+  if (type == NEX_EVENT_PUSH) { Serial.println(F("AIR (b3, id 8) pressed")); flashLed(); }
+}
+// ...and in setup():  airButton.attachCallback(&onAirButton);
+```
+
+Dual-state buttons use `NextionDualStateButton` with the same constructor
+and callback signature.
 
 ## Why events were not registering (and how to avoid it again)
 
