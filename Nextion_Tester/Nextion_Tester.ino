@@ -5,11 +5,11 @@
  * an Arduino over serial. It proves that touch events from the display reach
  * the Arduino and that the Arduino can write back to widgets.
  *
- * Wiring (display -> Arduino):
+ * Wiring (display -> Arduino), see README.md for the full diagram:
  *   red    5V   -> 5V
  *   black  GND  -> GND
- *   blue   TX   -> NEXTION_RX_PIN (or Serial1 RX on boards that have it)
- *   yellow RX   -> NEXTION_TX_PIN (or Serial1 TX on boards that have it)
+ *   blue   TX   -> Serial1 RX (D0 on Nano Every, 19 on Mega) or NEXTION_RX_PIN
+ *   yellow RX   -> Serial1 TX (D1 on Nano Every, 18 on Mega) or NEXTION_TX_PIN
  *
  * Nextion Editor checklist for every button you want events from:
  *   - note the component's "id" and "objname" attributes and mirror them below
@@ -34,7 +34,7 @@
 // followed by a release on page 0, component 6 should print:
 //   65 00 06 01 FF FF FF
 //   65 00 06 00 FF FF FF
-// Can also be set without editing: .\build.ps1 upload -RawDump
+// Can also be set without editing: ./build.sh upload --raw-dump
 #ifndef RAW_DUMP
 #define RAW_DUMP 0
 #endif
@@ -58,8 +58,8 @@
 // ---------------------------------------------------------------------------
 
 #if defined(HAVE_HWSERIAL1)
-// Mega, Leonardo, Micro, etc.: use the real UART. Far more reliable than
-// SoftwareSerial and leaves the USB port free for debug output.
+// Nano Every (D0/D1), Mega (19/18), Leonardo, Micro: use the real UART. Far
+// more reliable than SoftwareSerial and leaves the USB port free for debug.
 #define nextionSerial Serial1
 #else
 #include <SoftwareSerial.h>

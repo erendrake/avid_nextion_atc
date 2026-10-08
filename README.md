@@ -16,11 +16,11 @@ far and its job is to prove the display and the Arduino can talk both ways.
 | Path | What it is |
 | --- | --- |
 | `Nextion_Tester/Nextion_Tester.ino` | Bring-up sketch: two buttons, callbacks, status LED, raw byte dump mode |
-| `Nextion_Tester/sketch.yaml` | arduino-cli build profiles (`uno`, `nano`, `mega`) pinned to a board core and the vendored libraries |
+| `Nextion_Tester/sketch.yaml` | arduino-cli build profiles (`nano_every` default, plus `uno`, `nano`, `mega`) pinned to board cores and the vendored libraries |
 | `libraries/NeoNextion/` | Vendored [NeoNextion](https://github.com/DanNixon/NeoNextion) 2.2.0, the Nextion driver (GPL v2) |
 | `libraries/AccelStepper/` | Vendored [AccelStepper](http://www.airspayce.com/mikem/arduino/AccelStepper/) 1.64 for future stepper control (GPL v3) |
-| `build.ps1` | Windows wrapper: compile, upload, serial monitor, port discovery |
-| `.github/workflows/compile.yml` | CI: compiles the sketch for Uno, Nano and Mega on every push and PR |
+| `build.sh` | Wrapper for Git Bash / macOS / Linux: compile, upload, serial monitor, port discovery |
+| `.github/workflows/compile.yml` | CI: compiles the sketch for all four profiles on every push and PR |
 
 The Nextion Editor project (`.HMI`) is not checked in yet. When it is, put it
 under `hmi/` alongside the compiled `.tft` so the firmware and screen layout
@@ -28,60 +28,96 @@ version together.
 
 ## Hardware
 
-- Any 5 V AVR Arduino. An **Uno** or **Nano** works with SoftwareSerial on
-  pins 10 and 11. A **Mega 2560** (or Leonardo/Micro) is preferred because the
-  sketch automatically switches to the hardware `Serial1` UART, which is more
-  reliable and leaves USB free for debug output.
+- **Arduino Nano Every** is the primary target (ATmega4809, 5 V logic). It
+  has a hardware `Serial1` on D0/D1 that is independent of the USB port, so
+  the display gets a real UART and the serial monitor stays free for debug
+  output. The sketch detects this at compile time via `HAVE_HWSERIAL1`.
+- Also supported: **Uno** and classic **Nano** (SoftwareSerial on D10/D11,
+  less reliable) and **Mega 2560** (hardware `Serial1` on pins 19/18).
 - A Nextion display (any Basic/Enhanced/Intelligent model). Default baud is
-  9600.
-- Optional: an LED on pin 7 that mirrors the UP button.
+  9600. The display's TX is 3.3 V and its RX tolerates 5 V, so no level
+  shifting is needed with any of these boards.
+- Optional: an LED on D7 that mirrors the UP button.
 
-Wiring, display to Arduino:
+### Wiring diagram (Nano Every)
 
-| Nextion wire | Uno / Nano | Mega / Leonardo |
-| --- | --- | --- |
-| red, 5V | 5V | 5V |
-| black, GND | GND | GND |
-| blue, TX | D10 | RX1 (pin 19 on Mega) |
-| yellow, RX | D11 | TX1 (pin 18 on Mega) |
+```
+            Arduino Nano Every                                Nextion display
+           +------------------+                              (4-pin JST lead)
+  USB  <-->| USB              |                              +--------------+
+           |                  |                              |              |
+           |   D1 / TX1       |----------------------------->| RX   yellow  |
+           |   D0 / RX1       |<-----------------------------| TX   blue    |
+           |   5V             |------------------------------| 5V   red     |
+           |   GND            |---------+--------------------| GND  black   |
+           |                  |         |                    +--------------+
+           |   D7             |--[330R]-|>|--+               
+           |                  |             |                 optional status LED
+           |   GND            |-------------+                 (anode to resistor)
+           +------------------+
+```
 
-Power the display from the Arduino's 5 V pin only for small displays. Larger
-panels draw more than USB can supply; feed them from a separate 5 V source
-and share ground.
+Cross the data lines: the display's **TX** goes to the Arduino's **RX**, and
+vice versa. Getting this backwards is the single most common wiring fault
+and shows up as `Nextion init: no reply`.
+
+Pin table for every supported board:
+
+| Nextion wire | Nano Every | Uno / Nano | Mega 2560 |
+| --- | --- | --- | --- |
+| red, 5V | 5V | 5V | 5V |
+| black, GND | GND | GND | GND |
+| blue, TX | D0 (RX1) | D10 | pin 19 (RX1) |
+| yellow, RX | D1 (TX1) | D11 | pin 18 (TX1) |
+| status LED (optional) | D7 | D7 | D7 |
+
+Power the display from the Arduino's 5 V pin only for small panels (the 2.4"
+to 3.5" Basic models draw well under 250 mA). Larger or Enhanced/Intelligent
+panels can draw more than USB supplies; feed them from a separate 5 V source
+and tie the grounds together.
+
+On the Nano Every, D0 and D1 are dedicated to `Serial1` and are not shared
+with USB, so uploading over USB works with the display connected. On an Uno
+or Mega the USB port is `Serial`, which is separate from the pins used here,
+so the same holds.
 
 ## Setting up a new machine
 
 Everything builds with [arduino-cli](https://arduino.github.io/arduino-cli/).
-The Arduino IDE is not required.
+The Arduino IDE is not required. All commands below are for Git Bash on
+Windows and work unchanged on macOS and Linux.
 
-```powershell
-winget install --id ArduinoSA.CLI -e     # or: .\build.ps1 install
-# open a new terminal so arduino-cli is on PATH
-.\build.ps1                               # compiles for the Uno profile
+```sh
+./build.sh install     # winget on Windows, brew on macOS, curl installer on Linux
+# open a new shell so arduino-cli is on PATH
+./build.sh             # compiles for the default profile (nano_every)
 ```
 
 The first compile downloads the pinned `arduino:avr` core into arduino-cli's
 cache. Nothing is installed into a global sketchbook; the libraries come from
 `libraries/` in this repo via the `dir:` entries in `sketch.yaml`.
 
-On macOS or Linux, call arduino-cli directly:
+The wrapper is thin. The underlying commands, if you prefer them directly:
 
 ```sh
-arduino-cli compile --profile uno  Nextion_Tester
-arduino-cli upload  --profile uno  -p /dev/ttyACM0 Nextion_Tester
-arduino-cli monitor -p /dev/ttyACM0 --config baudrate=115200
+arduino-cli compile --profile nano_every  Nextion_Tester
+arduino-cli upload  --profile nano_every  -p COM7 Nextion_Tester   # or /dev/ttyACM0
+arduino-cli monitor -p COM7 --config baudrate=115200
 ```
+
+Profiles: `nano_every` (default), `uno`, `nano`, `mega`.
 
 ## Build, flash, monitor
 
-```powershell
-.\build.ps1 ports                 # list serial ports and detected boards
-.\build.ps1 -Profile mega         # compile only
-.\build.ps1 upload                # compile and upload, auto-detect the port
-.\build.ps1 upload -Port COM7     # compile and upload to a specific port
-.\build.ps1 upload -RawDump       # raw byte dump build, see Troubleshooting
-.\build.ps1 monitor -Port COM7    # 115200 baud debug console
-.\build.ps1 all -Port COM7        # compile, upload, then monitor
+```sh
+./build.sh ports                  # list serial ports and detected boards
+./build.sh build -p mega          # compile only, for the mega profile
+./build.sh upload                 # compile and upload, auto-detect the port
+./build.sh upload -P COM7         # compile and upload to a specific port
+./build.sh upload --raw-dump      # raw byte dump build, see Troubleshooting
+./build.sh monitor -P COM7        # 115200 baud debug console
+./build.sh all -P COM7            # compile, upload, then monitor
+./build.sh --help                 # all options
 ```
 
 Expected output on the monitor after reset:
@@ -154,15 +190,16 @@ Work through these in order.
    common mistake), confirm 9600 in the HMI, confirm the display has power and
    shows page 0.
 2. **Init OK but no events.** Build the raw dump variant with
-   `.\build.ps1 upload -RawDump` (or set `RAW_DUMP 1` in the sketch) and press
+   `./build.sh upload --raw-dump` (or set `RAW_DUMP 1` in the sketch) and press
    a button. If you see nothing, Send Component ID is not ticked in the HMI (see
    above). If you see `65 00 06 01 FF FF FF`, the display is fine; check that
    the page and component ids in the sketch match the second and third bytes.
 3. **Events for one button but not the other.** Component id mismatch, or
    Send Component ID is ticked on Press but not Release (or vice versa).
-4. **Garbage bytes or intermittent events on an Uno.** SoftwareSerial is
-   bit-banged and gets disturbed by other interrupts. Move to a Mega and use
-   `Serial1`, or drop the display baud rate.
+4. **Garbage bytes or intermittent events on an Uno or classic Nano.**
+   SoftwareSerial is bit-banged and gets disturbed by other interrupts. Use a
+   Nano Every or Mega so the display is on a hardware `Serial1`, or drop the
+   display baud rate.
 5. **`setText` does nothing.** The `objname` in the sketch does not match the
    HMI, or the widget is on a page that is not currently shown.
 

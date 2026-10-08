@@ -13,30 +13,35 @@ and, ideally, behaves on real hardware (which CI cannot check).
 ## Build commands
 
 Everything goes through arduino-cli using the profiles in
-`Nextion_Tester/sketch.yaml` (`uno`, `nano`, `mega`). Profiles pin the
-`arduino:avr@1.8.6` core and point at the vendored libraries, so no global
-library or core installs are needed.
+`Nextion_Tester/sketch.yaml`. The primary target is the **Arduino Nano
+Every** (`nano_every`, `arduino:megaavr` core); `uno`, `nano` and `mega` on
+`arduino:avr` are secondary targets kept building. Profiles pin core versions
+and point at the vendored libraries, so no global library or core installs
+are needed.
 
-```powershell
-.\build.ps1                          # compile, default profile uno
-.\build.ps1 -Profile mega            # compile for another profile
-.\build.ps1 build -RawDump           # compile with RAW_DUMP=1 (raw byte dump, no event decoding)
-.\build.ps1 upload -Port COM7        # compile + upload
-.\build.ps1 monitor -Port COM7       # 115200 baud serial monitor
-.\build.ps1 ports                    # list serial ports
-```
-
-Raw arduino-cli equivalents (any OS):
+The user works in Git Bash on Windows; use `build.sh`, not PowerShell.
 
 ```sh
-arduino-cli compile --profile uno Nextion_Tester
-arduino-cli compile --profile uno --build-property build.extra_flags=-DRAW_DUMP=1 Nextion_Tester
+./build.sh                           # compile, default profile nano_every
+./build.sh build -p mega             # compile for another profile
+./build.sh build --raw-dump          # compile with RAW_DUMP=1 (raw byte dump, no event decoding)
+./build.sh upload -P COM7            # compile + upload
+./build.sh monitor -P COM7           # 115200 baud serial monitor
+./build.sh ports                     # list serial ports
 ```
 
-Before claiming a change builds, compile **all three profiles**. The mega
-profile exercises a different code path (hardware `Serial1` instead of
-SoftwareSerial), so an Uno-only compile is not sufficient. CI
-(`.github/workflows/compile.yml`) does the same three builds.
+Raw arduino-cli equivalents:
+
+```sh
+arduino-cli compile --profile nano_every Nextion_Tester
+arduino-cli compile --profile nano_every --build-property build.extra_flags=-DRAW_DUMP=1 Nextion_Tester
+```
+
+Before claiming a change builds, compile **all four profiles**. They cover
+two different cores (megaavr and avr) and two serial code paths (hardware
+`Serial1` on nano_every/mega, SoftwareSerial on uno/nano), so a single
+profile is not sufficient. CI (`.github/workflows/compile.yml`) runs the
+same four builds; keep its matrix in sync with `sketch.yaml`.
 
 arduino-cli's default is `--warnings none`. Turning warnings on floods the
 output with `-Wwrite-strings` from the vendored NeoNextion; that noise is
@@ -55,9 +60,10 @@ sanctioned way to look at raw bytes is the `RAW_DUMP` build, which disables
 event decoding entirely.
 
 **Port selection is compile-time.** The sketch checks `HAVE_HWSERIAL1` (defined
-by the AVR core on Mega/Leonardo/Micro) and aliases `nextionSerial` to
-`Serial1`; otherwise it instantiates SoftwareSerial on pins 10/11. Keep any new
-code using the `nextionSerial` name rather than a concrete port.
+by the megaavr core on the Nano Every, where `Serial1` is D0/D1, and by the
+AVR core on Mega/Leonardo/Micro) and aliases `nextionSerial` to `Serial1`;
+otherwise it instantiates SoftwareSerial on pins 10/11. Keep any new code
+using the `nextionSerial` name rather than a concrete port.
 
 **Widgets are declared globally and self-register.** Each `NextionButton`
 (or other `INextionTouchable`) constructor appends itself to a linked list

@@ -13,13 +13,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Keep in sync with the profiles in Nextion_Tester/sketch.yaml.
         board:
+          - name: nano_every
+            fqbn: arduino:megaavr:nona4809
+            platform: arduino:megaavr
+            version: 1.8.8
           - name: uno
             fqbn: arduino:avr:uno
+            platform: arduino:avr
+            version: 1.8.6
           - name: nano
             fqbn: arduino:avr:nano:cpu=atmega328old
+            platform: arduino:avr
+            version: 1.8.6
           - name: mega
             fqbn: arduino:avr:mega:cpu=atmega2560
+            platform: arduino:avr
+            version: 1.8.6
 
     steps:
       - uses: actions/checkout@v4
@@ -29,8 +40,8 @@ jobs:
         with:
           fqbn: ${{ matrix.board.fqbn }}
           platforms: |
-            - name: arduino:avr
-              version: 1.8.6
+            - name: ${{ matrix.board.platform }}
+              version: ${{ matrix.board.version }}
           libraries: |
             - source-path: ./libraries/NeoNextion
             - source-path: ./libraries/AccelStepper
