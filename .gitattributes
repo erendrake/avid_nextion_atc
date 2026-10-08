@@ -1,0 +1,13 @@
+# Normalise line endings in the repo; let Git pick the working-copy style.
+* text=auto
+
+# Shell scripts must stay LF or Git Bash refuses to run them ("\r: command not found").
+*.sh text eol=lf
+
+# Nextion assets and compiled firmware are binary.
+*.HMI binary
+*.tft binary
+*.zi  binary
+*.png binary
+*.gif binary
+*.hex binary

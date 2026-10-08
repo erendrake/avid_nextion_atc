@@ -5,11 +5,21 @@
 #   arduino-cli compile --profile uno
 #   arduino-cli upload  --profile uno -p COM5
 #
-# See ../build.ps1 for a wrapper that also opens the serial monitor.
+# See ../build.sh for a wrapper that also opens the serial monitor.
 
-default_profile: uno
+default_profile: nano_every
 
 profiles:
+  # Primary target. ATmega4809 on the arduino:megaavr core, not arduino:avr.
+  # Has a hardware Serial1 on D0/D1 separate from the USB port.
+  nano_every:
+    fqbn: arduino:megaavr:nona4809
+    platforms:
+      - platform: arduino:megaavr (1.8.8)
+    libraries:
+      - dir: ../libraries/NeoNextion
+      - dir: ../libraries/AccelStepper
+
   uno:
     fqbn: arduino:avr:uno
     platforms:
