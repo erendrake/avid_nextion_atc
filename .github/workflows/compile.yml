@@ -8,46 +8,29 @@ on:
 
 jobs:
   compile:
-    name: ${{ matrix.board.name }}
+    name: ${{ matrix.profile }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # Keep in sync with the profiles in Nextion_Tester/sketch.yaml.
-        board:
-          - name: nano_every
-            fqbn: arduino:megaavr:nona4809
-            platform: arduino:megaavr
-            version: 1.8.8
-          - name: uno
-            fqbn: arduino:avr:uno
-            platform: arduino:avr
-            version: 1.8.6
-          - name: nano
-            fqbn: arduino:avr:nano:cpu=atmega328old
-            platform: arduino:avr
-            version: 1.8.6
-          - name: mega
-            fqbn: arduino:avr:mega:cpu=atmega2560
-            platform: arduino:avr
-            version: 1.8.6
+        # One job per profile in Nextion_Tester/sketch.yaml. The profile pins
+        # the board core and the vendored libraries, so CI builds exactly what
+        # ./build.sh builds locally. Add a profile there, then add it here.
+        profile: [nano_every, uno, nano, mega]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile
-        uses: arduino/compile-sketches@v1
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Cache board cores
+        uses: actions/cache@v4
         with:
-          fqbn: ${{ matrix.board.fqbn }}
-          platforms: |
-            - name: ${{ matrix.board.platform }}
-              version: ${{ matrix.board.version }}
-          libraries: |
-            - source-path: ./libraries/NeoNextion
-            - source-path: ./libraries/AccelStepper
-          sketch-paths: |
-            - Nextion_Tester
-          enable-deltas-report: false
-          # The vendored NeoNextion library produces dozens of -Wwrite-strings
-          # warnings that would drown out anything from the sketch itself.
-          enable-warnings-report: false
+          path: ~/.arduino15
+          key: arduino15-${{ runner.os }}-${{ hashFiles('Nextion_Tester/sketch.yaml') }}
+
+      - name: Compile (${{ matrix.profile }})
+        run: ./build.sh build -p ${{ matrix.profile }}
+
+      - name: Compile raw-dump variant (${{ matrix.profile }})
+        run: ./build.sh build -p ${{ matrix.profile }} --raw-dump
