@@ -22,6 +22,7 @@
 #   -P, --port     COMx or /dev/tty* (default: auto-detect)
 #   -b, --baud     monitor baud     (default: 115200)
 #   --raw-dump                       compile with -DRAW_DUMP=1
+#   --display-baud N                 compile with -DDISPLAY_BAUD=N (NextionBridge: the display's current baud)
 #   -v, --verbose                    show compiler warnings
 
 set -euo pipefail
@@ -34,6 +35,7 @@ profile="nano_every"
 port=""
 baud="115200"
 raw_dump=0
+display_baud=""
 warnings="none"
 
 usage() { sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; }
@@ -46,6 +48,7 @@ while [ $# -gt 0 ]; do
     -P|--port)    port="$2"; shift ;;
     -b|--baud)    baud="$2"; shift ;;
     --raw-dump)   raw_dump=1 ;;
+    --display-baud) display_baud="$2"; shift ;;
     -v|--verbose) warnings="default" ;;
     -h|--help)    usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -73,9 +76,10 @@ assert_cli() {
 
 find_port() {
   if [ -n "$port" ]; then echo "$port"; return; fi
-  # Columns: Port Protocol Type Board FQBN Core. Prefer a port with a recognised board.
+  # Columns: Port Protocol Type Board FQBN Core. Prefer a port with a recognised
+  # board; skip macOS's Bluetooth pseudo-port.
   local list
-  list="$(arduino-cli board list 2>/dev/null | awk 'NR>1 && $2=="serial"')"
+  list="$(arduino-cli board list 2>/dev/null | awk 'NR>1 && $2=="serial"' | grep -vi bluetooth || true)"
   local pick
   pick="$(printf '%s\n' "$list" | grep -m1 'arduino:' | awk '{print $1}' || true)"
   [ -z "$pick" ] && pick="$(printf '%s\n' "$list" | head -n1 | awk '{print $1}')"
@@ -88,15 +92,20 @@ find_port() {
 }
 
 do_build() {
-  local extra=()
+  local extra=() flags=""
   if [ "$raw_dump" = 1 ]; then
     warn "RAW_DUMP=1: events will not be decoded"
-    extra+=(--build-property "build.extra_flags=-DRAW_DUMP=1")
+    flags="$flags -DRAW_DUMP=1"
   fi
+  if [ -n "$display_baud" ]; then
+    warn "DISPLAY_BAUD=$display_baud"
+    flags="$flags -DDISPLAY_BAUD=$display_baud"
+  fi
+  [ -n "$flags" ] && extra+=(--build-property "build.extra_flags=$flags")
   say "Compiling $sketch for profile '$profile'..."
   # Warnings default to off: the vendored NeoNextion library emits dozens of
   # -Wwrite-strings warnings that drown out anything from the sketch.
-  arduino-cli compile --profile "$profile" --warnings "$warnings" "${extra[@]}" "$sketch"
+  arduino-cli compile --profile "$profile" --warnings "$warnings" ${extra[@]+"${extra[@]}"} "$sketch"
 }
 
 do_upload() {

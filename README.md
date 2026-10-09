@@ -21,6 +21,8 @@ far and its job is to prove the display and the Arduino can talk both ways.
 | `libraries/NeoNextion/` | Vendored [NeoNextion](https://github.com/DanNixon/NeoNextion) 2.2.0, the Nextion driver (GPL v2) |
 | `libraries/AccelStepper/` | Vendored [AccelStepper](http://www.airspayce.com/mikem/arduino/AccelStepper/) 1.64 for future stepper control (GPL v3) |
 | `build.sh` | Wrapper for Git Bash / macOS / Linux: compile, upload, serial monitor, port discovery |
+| `tools/nextion_probe.py` | Serial diagnostics: `connect` handshake through the bridge, or decode touch frames from the raw-dump build |
+| `tools/baud_scan.sh` | Reflashes the bridge at each common baud and probes, to find the display's rate |
 | `.github/workflows/compile.yml` | CI: compiles the sketch for all four profiles on every push and PR |
 
 The Nextion Editor project (`.HMI`) is not checked in yet. When it is, put it
@@ -95,6 +97,20 @@ Windows and work unchanged on macOS and Linux.
 The first compile downloads the pinned `arduino:avr` core into arduino-cli's
 cache. Nothing is installed into a global sketchbook; the libraries come from
 `libraries/` in this repo via the `dir:` entries in `sketch.yaml`.
+
+### macOS notes
+
+- `brew install arduino-cli` is all the toolchain needs. The Nano Every
+  needs no driver.
+- The board appears as `/dev/cu.usbmodemXXXX`. Use the `cu.` device, not
+  the `tty.` twin. `./build.sh ports` lists it, and auto-detection skips the
+  `Bluetooth-Incoming-Port` entry.
+- The diagnostics in `tools/` need Python 3 with pyserial:
+  `python3 -m pip install --user pyserial` (or
+  `python3 -m pip install --user -r tools/requirements.txt`). If pip refuses
+  with an "externally managed environment" error, use a venv:
+  `python3 -m venv .venv && .venv/bin/pip install pyserial` and run the
+  tools with `.venv/bin/python`.
 
 The wrapper is thin. The underlying commands, if you prefer them directly:
 
@@ -271,16 +287,59 @@ buffer, so a press and release (14 bytes) survive 300 ms at 9600 baud, but a
 few quick taps will overflow it and corrupt frames. `loop()` should call
 `nex.poll()` and nothing that blocks.
 
+## Diagnostics
+
+Two tools in `tools/` answer the two questions that come up most, without
+the Nextion Editor and from any OS. Both need Python 3 with pyserial and
+auto-detect the Arduino's port (pass `-p <port>` to override).
+
+**Is the display wired and at what baud?** Flash the bridge and send the
+`connect` handshake. A `comok` reply proves TX, RX, power and baud at once.
+
+```sh
+./build.sh upload -s NextionBridge
+python3 tools/nextion_probe.py                 # connect at 9600
+python3 tools/nextion_probe.py -b 115200       # or another rate
+tools/baud_scan.sh                             # reflash + probe at every common rate
+```
+
+Silence at every rate means the display's TX line (blue) is not reaching
+the Arduino, or the display has no power. It is not a configuration issue.
+
+**What are my component ids?** Flash the raw-dump build, listen, and press
+each button. `--decode` turns the frames into readable lines and lists the
+ids seen at the end.
+
+```sh
+./build.sh upload --raw-dump
+python3 tools/nextion_probe.py listen -b 115200 -t 45 --decode
+```
+
+```
+65 00 06 01 FF FF FF
+  >> touch: page 0, component id 6, PRESS
+65 00 06 00 FF FF FF
+  >> touch: page 0, component id 6, RELEASE
+
+component ids seen: [6, 7]
+```
+
+Put those ids into the `ID_*` defines in the sketch, flash the normal build
+with `./build.sh upload`, and the callbacks will fire.
+
 ## Troubleshooting
 
 Work through these in order.
 
-1. **`Nextion init: no reply`.** Wiring or baud. Swap TX and RX (the most
-   common mistake), confirm 9600 in the HMI, confirm the display has power and
-   shows page 0.
+1. **`Nextion init: no reply`.** Wiring, power or baud. Run the `connect`
+   probe (see Diagnostics). If it is silent at every baud, check the display
+   is lit and inspect the blue TX wire end to end; a broken TX lead produced
+   exactly this on the bench. Otherwise swap TX and RX, the most common
+   mistake.
 2. **Init OK but no events.** Build the raw dump variant with
-   `./build.sh upload --raw-dump` (or set `RAW_DUMP 1` in the sketch) and press
-   a button. If you see nothing, Send Component ID is not ticked in the HMI (see
+   `./build.sh upload --raw-dump` (or set `RAW_DUMP 1` in the sketch), run
+   `python3 tools/nextion_probe.py listen -b 115200 --decode`, and press a
+   button. If you see nothing, Send Component ID is not ticked in the HMI (see
    above). If you see `65 00 06 01 FF FF FF`, the display is fine; check that
    the page and component ids in the sketch match the second and third bytes.
 3. **Events for one button but not the other.** Component id mismatch, or
