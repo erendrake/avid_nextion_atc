@@ -34,14 +34,20 @@ done
 
 [ ${#bauds[@]} -eq 0 ] && bauds=(9600 115200 57600 38400 19200 4800 2400)
 
-portarg=()
-[ -n "$port" ] && portarg=(-P "$port")
+# macOS ships bash 3.2, which treats an empty array as unset under `set -u`,
+# hence the ${arr[@]+"${arr[@]}"} form.
+flashport=()
+probeport=()
+if [ -n "$port" ]; then
+  flashport=(-P "$port")
+  probeport=(-p "$port")
+fi
 
 for b in "${bauds[@]}"; do
   echo "===== $b ====="
-  if ! "$repo/build.sh" upload -s NextionBridge -p "$profile" "${portarg[@]}" --display-baud "$b" > /dev/null 2>&1; then
+  if ! "$repo/build.sh" upload -s NextionBridge -p "$profile" ${flashport[@]+"${flashport[@]}"} --display-baud "$b" > /dev/null 2>&1; then
     echo "flash failed (run ./build.sh upload -s NextionBridge --display-baud $b to see why)"
     continue
   fi
-  python3 "$here/nextion_probe.py" connect -b "$b" "${portarg[@]/-P/-p}" | grep -E "connect|sendme|bauds"
+  python3 "$here/nextion_probe.py" connect -b "$b" ${probeport[@]+"${probeport[@]}"} | grep -E "connect|sendme|bauds"
 done
