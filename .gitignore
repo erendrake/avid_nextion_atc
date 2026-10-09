@@ -9,6 +9,10 @@ Thumbs.db
 build/
 **/build/
 
+# Python (tools/)
+__pycache__/
+.venv/
+
 # Processing / legacy Arduino exports
 applet
 application.linux-arm64

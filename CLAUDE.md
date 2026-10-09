@@ -21,7 +21,9 @@ Every** (`nano_every`, `arduino:megaavr` core); `uno`, `nano` and `mega` on
 and point at the vendored libraries, so no global library or core installs
 are needed.
 
-The user works in Git Bash on Windows; use `build.sh`, not PowerShell.
+The user works in Git Bash on Windows and in a terminal on macOS; use
+`build.sh` and the Python tools, never PowerShell-only scripts. On macOS the
+board is `/dev/cu.usbmodem*`; on Windows `COMx`.
 
 ```sh
 ./build.sh                           # compile Nextion_Tester, default profile nano_every
@@ -31,6 +33,14 @@ The user works in Git Bash on Windows; use `build.sh`, not PowerShell.
 ./build.sh upload -P COM7            # compile + upload
 ./build.sh monitor -P COM7           # 115200 baud serial monitor
 ./build.sh ports                     # list serial ports
+```
+
+Hardware diagnostics (Python 3 + pyserial, see README "Diagnostics"):
+
+```sh
+./build.sh upload -s NextionBridge && python3 tools/nextion_probe.py      # connect handshake, expect "comok"
+tools/baud_scan.sh                                                         # find the display's baud
+./build.sh upload --raw-dump && python3 tools/nextion_probe.py listen -b 115200 --decode   # read component ids
 ```
 
 Raw arduino-cli equivalents:
